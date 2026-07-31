@@ -179,7 +179,8 @@ async function search(query, start) {
 
 			if (newItems.length) {
 				let seq = getLongestCommonSequence(newItems[0].title, query);
-				if (seq.length >= 6 && seq.split(' ').length >= 2) {
+				//if (seq.length >= 6 && seq.split(' ').length >= 2) {
+				if (seq.length >= 6) {
 					items.push(newItems[0]);
 					// Keep track of last identifier if we're limiting results
 					if (moreResults) {
