@@ -58,18 +58,35 @@ var SearchEndpoint = module.exports = {
 	
 	handleIdentifier: async function (ctx, identifier) {
 		// Identifier
+		var translate = new Translate.Search();
+		translate.setIdentifier(identifier);
+		let translators = await translate.getTranslators();
+		if (!translators.length) {
+			ctx.throw(501, "No translators available", { expose: true });
+		}
+		
 		try {
-			var translate = new Translate.Search();
-			translate.setIdentifier(identifier);
-			let translators = await translate.getTranslators();
-			if (!translators.length) {
-				ctx.throw(501, "No translators available", { expose: true });
+			// Try each translator on its own translate instance, falling through in
+			// priority order -- a failed translator's stale async callbacks can
+			// otherwise abort the next translator's attempt
+			var items;
+			for (let i = 0; i < translators.length; i++) {
+				translate = new Translate.Search();
+				translate.setIdentifier(identifier);
+				translate.setTranslator(translators[i]);
+				try {
+					items = await translate.translate({
+						libraryID: false
+					});
+					break;
+				}
+				catch (e) {
+					if (i == translators.length - 1) {
+						throw e;
+					}
+					Zotero.debug("Search with " + translators[i].label + " failed: " + e, 1);
+				}
 			}
-			translate.setTranslator(translators);
-			
-			var items = await translate.translate({
-				libraryID: false
-			});
 		}
 		catch (e) {
 			if (e == translate.ERROR_NO_RESULTS) {

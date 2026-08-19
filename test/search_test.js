@@ -112,6 +112,50 @@ describe("/search", function () {
 	});
 	
 	
+	it("should fall back to the next search translator if one fails", async function () {
+		// Serve an HTML error page from Library of Congress (e.g., an IP block page)
+		// and MARCXML from the lower-priority K10plus catalog. Other catalogs get no
+		// mock, so their requests fail.
+		HTTP.request.callsFake(async function (method, url, options) {
+			if (url.startsWith('https://lx2.loc.gov')) {
+				return {
+					status: 200,
+					responseText: '<!DOCTYPE html>\n<html>\n<head>\n'
+						+ '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">\n'
+						+ '<title>LC Distribution Alert</title>\n</head>\n<body>\n'
+						+ '<p>Due to excessive traffic, your access to this system has been blocked.<br>\n'
+						+ '</body>\n</html>'
+				};
+			}
+
+			if (url.startsWith('https://sru.k10plus.de')) {
+				return {
+					status: 200,
+					responseText: fs.readFileSync(
+						path.join(__dirname, 'data', 'loc_book1_response.xml'),
+						{
+							encoding: 'utf-8'
+						}
+					)
+				};
+			}
+
+			throw new Error("Unhandled request");
+		});
+
+		var response = await request()
+			.post('/search')
+			.set('Content-Type', 'text/plain')
+			.send(bookISBN1);
+		assert.equal(response.statusCode, 200);
+		var json = response.body;
+
+		assert.equal(json[0].itemType, 'book');
+		assert.equal(json[0].title, bookTitle1);
+		assert.equal(json[0].libraryCatalog, 'K10plus ISBN');
+	});
+
+
 	it("should translate a PMID", async function () {
 		var response = await request()
 			.post('/search')
